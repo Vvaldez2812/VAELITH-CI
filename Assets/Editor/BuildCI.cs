@@ -33,7 +33,7 @@ public static class BuildCI
                 scenes = new[] { scene },
                 locationPathName = exePath,
                 target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.CompressWithLz4
+                options = BuildOptions.None
             };
 
             BuildReport report = BuildPipeline.BuildPlayer(options);
