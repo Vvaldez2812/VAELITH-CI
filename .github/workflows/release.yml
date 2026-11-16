@@ -1,0 +1,48 @@
+name: VAELITH QA Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vaelith-qa
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: [self-hosted, Windows, X64, unity-6000.6]
+    timeout-minutes: 60
+    environment: qa
+    defaults:
+      run:
+        shell: powershell
+    env:
+      UNITY_EDITOR: ${{ vars.UNITY_EDITOR }}
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Preparar entorno de liberacion
+        run: ./ci/prepare.ps1
+      - name: Ejecutar pruebas EditMode y PlayMode
+        run: ./ci/test.ps1
+      - name: Compilar cliente Windows x64
+        run: ./ci/build.ps1
+      - name: Verificar arranque de compilacion
+        run: ./ci/smoke.ps1
+      - name: Desplegar paquete y manifiesto a QA
+        run: ./ci/deploy.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-${{ env.BUILD_ID }}
+          path: artifacts/
+          retention-days: 14
+          if-no-files-found: error

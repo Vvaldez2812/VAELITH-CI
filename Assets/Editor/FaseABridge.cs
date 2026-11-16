@@ -1,0 +1,12 @@
+using System;using System.IO;using System.Linq;using UnityEngine;using UnityEditor;using UnityEditor.SceneManagement;
+public static class FaseABridge {
+const string O=@"C:/Users/faust/OneDrive/Desktop/VAELITH/FaseA_Correcciones";
+static string PathOf(Transform t)=>t.parent?PathOf(t.parent)+"/"+t.name:t.name;
+static void Tick(){if(EditorApplication.isCompiling||EditorApplication.isUpdating)return;var f=O+"/command.txt";if(!File.Exists(f))return;string cmd=File.ReadAllText(f).Trim();File.Delete(f);try{if(cmd=="restore_apply"){
+if(EditorApplication.isPlayingOrWillChangePlaymode)throw new Exception("Play activo");
+var previous=UnityEngine.SceneManagement.SceneManager.GetActiveScene();EditorSceneManager.SaveScene(previous,O+"/backup/Estado_Tras_Reinicio.unity",true);
+string recovery="Assets/Scenes/FaseA_Recuperacion.unity";File.Copy(O+"/backup/Scene_Live.unity",recovery,true);AssetDatabase.ImportAsset(recovery);
+var recovered=EditorSceneManager.OpenScene(recovery);EditorSceneManager.SaveScene(recovered,"Assets/Scenes/Exterior_Docencia2.unity");FaseACancel.Apply();
+File.WriteAllText(O+"/restaurado_y_p16_aplicado.txt",DateTime.UtcNow.ToString("O"));
+}if(cmd=="apply_glass")FaseACancel.Apply();if(cmd=="run_paso2")AuditoriaPaso2Executor.ExecuteAllBatchesAndStartPlayVerify();if(cmd=="inspect"){if(EditorApplication.isPlayingOrWillChangePlaymode)throw new Exception("Play activo: inspeccion pospuesta");var s=UnityEngine.SceneManagement.SceneManager.GetActiveScene();if(s.name!="Exterior_Docencia2")throw new Exception("Otra escena activa");EditorSceneManager.SaveScene(s,O+"/backup/Scene_Live.unity",true);var lines=new System.Collections.Generic.List<string>();foreach(var root in s.GetRootGameObjects())foreach(var t in root.GetComponentsInChildren<Transform>(true)){var r=t.GetComponent<Renderer>();var l=t.GetComponent<Light>();lines.Add(PathOf(t)+"\t"+t.position.ToString("F3")+"\t"+t.eulerAngles+"\t"+t.localScale+"\t"+(r? r.bounds.ToString():"")+"\t"+(r?string.Join(",",r.sharedMaterials.Select(m=>m?m.name:"NULL")):"")+"\t"+string.Join(",",t.GetComponents<Component>().Where(c=>c).Select(c=>c.GetType().Name))+"\t"+(l?l.type+" intensity="+l.intensity+" range="+l.range:"") );}File.WriteAllLines(O+"/live.tsv",lines);File.WriteAllText(O+"/inspection_ok.txt",s.path+"; dirty="+s.isDirty+"; objects="+lines.Count);}}catch(Exception e){File.WriteAllText(O+"/error.txt",e.ToString());}}
+}
