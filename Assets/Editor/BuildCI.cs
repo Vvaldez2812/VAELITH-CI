@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public static class BuildCI
 {
@@ -19,19 +20,33 @@ public static class BuildCI
 
         string exePath = Path.Combine(playerDir, "VAELITH.exe");
 
-        var options = new BuildPlayerOptions
+        // En Windows QA usamos Direct3D11 (alineado con Editor) y LZ4 para acelerar empaquetado sin cambiar calidad visual
+        GraphicsDeviceType[] prevApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.StandaloneWindows64);
+        bool prevAuto = PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64);
+        try
         {
-            scenes = new[] { scene },
-            locationPathName = exePath,
-            target = BuildTarget.StandaloneWindows64,
-            options = BuildOptions.None
-        };
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneWindows64, new[] { GraphicsDeviceType.Direct3D11 });
 
-        BuildReport report = BuildPipeline.BuildPlayer(options);
-        BuildSummary summary = report.summary;
-        Debug.Log($"[BuildCI] Result={summary.result} | SizeBytes={summary.totalSize} | Time={summary.totalTime.TotalSeconds:F2}s | Warnings={summary.totalWarnings} | Errors={summary.totalErrors}");
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { scene },
+                locationPathName = exePath,
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.CompressWithLz4
+            };
 
-        if (summary.result != BuildResult.Succeeded)
-            throw new Exception($"La compilacion StandaloneWindows64 fallo: {summary.result} (errores: {summary.totalErrors})");
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            BuildSummary summary = report.summary;
+            Debug.Log($"[BuildCI] Result={summary.result} | SizeBytes={summary.totalSize} | Time={summary.totalTime.TotalSeconds:F2}s | Warnings={summary.totalWarnings} | Errors={summary.totalErrors}");
+
+            if (summary.result != BuildResult.Succeeded)
+                throw new Exception($"La compilacion StandaloneWindows64 fallo: {summary.result} (errores: {summary.totalErrors})");
+        }
+        finally
+        {
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64, prevAuto);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneWindows64, prevApis);
+        }
     }
 }
