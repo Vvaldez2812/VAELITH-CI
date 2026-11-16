@@ -604,7 +604,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 2406038}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1068733133}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!108 &2406042
@@ -97875,7 +97875,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 357954727}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1068733133}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!108 &357954731
@@ -138720,7 +138720,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 500172973}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1890045643}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!114 &500172976
@@ -198049,21 +198049,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 722149022}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!115 &722237903
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: Docencia2LightFlicker
-  m_Namespace: Vaelith.Docencia2
-  m_AssemblyName: Assembly-CSharp
 --- !u!1 &722678104
 GameObject:
   m_ObjectHideFlags: 0
@@ -198197,7 +198182,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 722753678}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 722753682}
@@ -217267,7 +217252,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 789910018}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1890045643}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!114 &789910021
@@ -266357,7 +266342,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 972017622}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 972017626}
@@ -270048,7 +270033,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 983898524}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 983898528}
@@ -293636,21 +293621,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1068663658}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!115 &1068733133
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: Docencia2LightFlicker
-  m_Namespace: Vaelith.Docencia2
-  m_AssemblyName: Assembly-CSharp
 --- !u!1 &1068954870
 GameObject:
   m_ObjectHideFlags: 0
@@ -395497,7 +395467,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1438460622}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 1438460626}
@@ -446749,7 +446719,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1607021525}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 1607021529}
@@ -469295,7 +469265,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1662946850}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 722237903}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
   targetLight: {fileID: 1662946854}
@@ -510806,7 +510776,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1811716023}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1890045643}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!114 &1811716026
@@ -515364,7 +515334,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1828589000}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 1890045643}
+  m_Script: {fileID: 11500000, guid: f4c8d9e2a1b347c5902184a6e3d7b901, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vaelith.Docencia2.Docencia2LightFlicker
 --- !u!114 &1828589003
@@ -532144,21 +532114,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1889357119}
   m_Mesh: {fileID: 4300000, guid: d830bad2b03f4004195032f8e34b005c, type: 2}
---- !u!115 &1890045643
-MonoScript:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  serializedVersion: 7
-  m_DefaultReferences: {}
-  m_Icon: {fileID: 0}
-  m_Type: 0
-  m_ExecutionOrder: 0
-  m_ClassName: Docencia2LightFlicker
-  m_Namespace: Vaelith.Docencia2
-  m_AssemblyName: Assembly-CSharp
 --- !u!1 &1890064020
 GameObject:
   m_ObjectHideFlags: 0

@@ -582,22 +582,37 @@ namespace Vaelith.Docencia2
                 var mf = beamGo.AddComponent<MeshFilter>();
                 mf.sharedMesh = BuildOpenConeMesh(0.016f, 0.68f, 2.9f);
                 var mr = beamGo.AddComponent<MeshRenderer>();
-                Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Transparent");
-                var beamMat = new Material(unlitShader);
-                beamMat.SetTexture("_BaseMap", GetOrCreateVolumetricConeTexture());
-                beamMat.SetColor("_BaseColor", new Color(0.86f, 0.94f, 1.0f, volumetricBeamBaseAlpha));
-                if (beamMat.HasProperty("_Surface")) beamMat.SetFloat("_Surface", 1f);
-                if (beamMat.HasProperty("_Blend")) beamMat.SetFloat("_Blend", 2f); // Additive
-                if (beamMat.HasProperty("_SrcBlend")) beamMat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
-                if (beamMat.HasProperty("_DstBlend")) beamMat.SetFloat("_DstBlend", (float)BlendMode.One);
-                if (beamMat.HasProperty("_ZWrite")) beamMat.SetFloat("_ZWrite", 0f);
-                if (beamMat.HasProperty("_Cull")) beamMat.SetFloat("_Cull", 0f);
-                beamMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                beamMat.renderQueue = 3100;
-                mr.sharedMaterial = beamMat;
-                mr.shadowCastingMode = ShadowCastingMode.Off;
-                mr.receiveShadows = false;
-                volumetricBeamRenderer = mr;
+                Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit");
+                if (unlitShader == null) unlitShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+                if (unlitShader == null) unlitShader = Shader.Find("Unlit/Transparent");
+                if (unlitShader == null) unlitShader = Shader.Find("Sprites/Default");
+                if (unlitShader != null)
+                {
+                    var beamMat = new Material(unlitShader);
+                    var coneTex = GetOrCreateVolumetricConeTexture();
+                    if (beamMat.HasProperty("_BaseMap")) beamMat.SetTexture("_BaseMap", coneTex);
+                    else beamMat.mainTexture = coneTex;
+                    Color initBeamCol = new Color(0.86f, 0.94f, 1.0f, volumetricBeamBaseAlpha);
+                    if (beamMat.HasProperty("_BaseColor")) beamMat.SetColor("_BaseColor", initBeamCol);
+                    if (beamMat.HasProperty("_Color")) beamMat.SetColor("_Color", initBeamCol);
+                    if (beamMat.HasProperty("_Surface")) beamMat.SetFloat("_Surface", 1f);
+                    if (beamMat.HasProperty("_Blend")) beamMat.SetFloat("_Blend", 2f); // Additive
+                    if (beamMat.HasProperty("_SrcBlend")) beamMat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                    if (beamMat.HasProperty("_DstBlend")) beamMat.SetFloat("_DstBlend", (float)BlendMode.One);
+                    if (beamMat.HasProperty("_ZWrite")) beamMat.SetFloat("_ZWrite", 0f);
+                    if (beamMat.HasProperty("_Cull")) beamMat.SetFloat("_Cull", 0f);
+                    beamMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                    beamMat.renderQueue = 3100;
+                    mr.sharedMaterial = beamMat;
+                    mr.shadowCastingMode = ShadowCastingMode.Off;
+                    mr.receiveShadows = false;
+                    volumetricBeamRenderer = mr;
+                }
+                else
+                {
+                    mr.enabled = false;
+                    volumetricBeamRenderer = null;
+                }
             }
             else
             {
@@ -626,7 +641,9 @@ namespace Vaelith.Docencia2
                 {
                     if (_volumetricMpb == null) _volumetricMpb = new MaterialPropertyBlock();
                     volumetricBeamRenderer.GetPropertyBlock(_volumetricMpb);
-                    _volumetricMpb.SetColor("_BaseColor", new Color(0.86f, 0.94f, 1.0f, volumetricBeamBaseAlpha * Mathf.Clamp(eff, 0.1f, 1.5f)));
+                    Color beamCol = new Color(0.86f, 0.94f, 1.0f, volumetricBeamBaseAlpha * Mathf.Clamp(eff, 0.1f, 1.5f));
+                    _volumetricMpb.SetColor("_BaseColor", beamCol);
+                    _volumetricMpb.SetColor("_Color", beamCol);
                     volumetricBeamRenderer.SetPropertyBlock(_volumetricMpb);
                 }
             }

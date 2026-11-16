@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -20,7 +20,7 @@ public static class BuildCI
 
         string exePath = Path.Combine(playerDir, "VAELITH.exe");
 
-        // En Windows QA usamos Direct3D11 (alineado con Editor) y LZ4 para acelerar empaquetado sin cambiar calidad visual
+        // En Windows QA usamos Direct3D11 (alineado con Editor)
         GraphicsDeviceType[] prevApis = PlayerSettings.GetGraphicsAPIs(BuildTarget.StandaloneWindows64);
         bool prevAuto = PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.StandaloneWindows64);
         try
