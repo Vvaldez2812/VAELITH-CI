@@ -151,7 +151,7 @@ namespace Vaelith.Docencia2
             var doors = new List<DoorDef>
             {
                 // Baños (nicho x = 12.24 abre hacia Baño Mujeres x < 12.24 -> inwardSign = -1; x = 16.24 abre hacia Baño Hombres x > 16.24 -> inwardSign = +1; bisagra en zMax = 7.46 junto al muro sur z = 7.71)
-                new DoorDef { name = "P13_Bano_Mujeres", x = 12.24f, isAlongX = false, zMin = 6.50f, zMax = 7.46f, hasVisionGlass = false, hingeAtMinCoord = false, inwardSign = -1 },
+                new DoorDef { name = "P13_Bano_Mujeres", x = 12.24f, isAlongX = false, zMin = 6.50f, zMax = 7.46f, hasVisionGlass = false, hingeAtMinCoord = false, inwardSign = -1, initialOpenDeg = 0f },
                 new DoorDef { name = "P14_Bano_Hombres", x = 16.24f, isAlongX = false, zMin = 6.50f, zMax = 7.46f, hasVisionGlass = false, hingeAtMinCoord = false, inwardSign = +1 },
 
                 // Sec 06: Puertas P26 (muro de madera oeste x = 3.62, abre hacia dentro del Espacio Oeste x < 3.62 -> inwardSign = -1)

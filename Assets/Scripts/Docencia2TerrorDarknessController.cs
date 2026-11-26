@@ -63,6 +63,8 @@ namespace Vaelith.Docencia2
         private ShadowCastingMode[] _cachedShadowModes;
         private Renderer[] _cachedInteriorRenderers;
         private bool _darknessApplied = false;
+        private bool _lastShadowsSuppressed = false;
+        private bool _inSync = false;
 
         // Luces originales que se apagan cuando el jugador está activo en modo TERROR extremo
         private List<Light> _suppressedLegacyTerrorLights = new List<Light>();
@@ -113,8 +115,8 @@ namespace Vaelith.Docencia2
 
         private void OnDisable()
         {
-            RestoreOriginalEnvironment();
             if (Instance == this) Instance = null;
+            RestoreOriginalEnvironment();
         }
 
         private void Start()
@@ -176,7 +178,8 @@ namespace Vaelith.Docencia2
             if (!Application.isPlaying) return;
 
             var kb = Keyboard.current;
-            if (kb != null && kb.bKey.wasPressedThisFrame)
+            bool allowShortcuts = player == null || player.showDebugHudAndShortcuts;
+            if (allowShortcuts && kb != null && kb.bKey.wasPressedThisFrame)
             {
                 CycleBrightnessPreset();
             }
@@ -184,11 +187,49 @@ namespace Vaelith.Docencia2
             SyncState();
 
             bool isTerror = switcher != null && switcher.modoActual == Docencia2VisualMode.Terror;
-            if (isTerror)
+            if (isTerror && _darknessApplied)
             {
                 UpdateDyingFluorescentAndEmergencyLights(Time.time);
                 UpdateZoneTrackingAndTensionEvents(Time.time, Time.deltaTime);
             }
+        }
+
+        public bool IsViewerOutdoor()
+        {
+            Vector3 viewerWorldPos = player != null ? player.transform.position : Vector3.zero;
+            Camera activeCam = null;
+
+            if (player != null && player.playerCamera != null && player.playerCamera.enabled &&
+                player.playerCamera.gameObject.activeInHierarchy && player.playerCamera.targetTexture == null)
+            {
+                activeCam = player.playerCamera;
+            }
+            else
+            {
+                float bestDepth = float.NegativeInfinity;
+                foreach (var cam in Camera.allCameras)
+                {
+                    if (cam == null || !cam.enabled || !cam.gameObject.activeInHierarchy || cam.targetTexture != null)
+                        continue;
+                    if (cam.depth >= bestDepth)
+                    {
+                        bestDepth = cam.depth;
+                        activeCam = cam;
+                    }
+                }
+            }
+
+            if (activeCam != null)
+            {
+                viewerWorldPos = activeCam.transform.position;
+            }
+
+            Vector2 plan = Docencia2FirstPersonPlayer.UnityToPlanXZ(viewerWorldPos);
+            bool insideBuilding =
+                plan.x >= 0.10f && plan.x <= 28.38f &&
+                plan.y >= 0.10f && plan.y <= 53.82f &&
+                viewerWorldPos.y >= -0.60f && viewerWorldPos.y <= 7.05f;
+            return !insideBuilding;
         }
 
         public void CycleBrightnessPreset()
@@ -206,30 +247,47 @@ namespace Vaelith.Docencia2
 
         public void SyncState()
         {
-            if (switcher == null) switcher = FindAnyObjectByType<Docencia2ModeSwitcher>();
-            if (player == null) player = Docencia2FirstPersonPlayer.Instance ?? FindAnyObjectByType<Docencia2FirstPersonPlayer>();
-            if (switcher == null) return;
-
-            bool isTerror = (switcher.modoActual == Docencia2VisualMode.Terror);
-
-            if (isTerror && !_darknessApplied)
+            if (_inSync || !isActiveAndEnabled || !gameObject.scene.isLoaded) return;
+            _inSync = true;
+            try
             {
-                EnterExtremeTerrorDarkness();
-            }
-            else if (!isTerror && _darknessApplied)
-            {
-                RestoreOriginalEnvironment();
-            }
+                if (switcher == null) switcher = FindAnyObjectByType<Docencia2ModeSwitcher>();
+                if (player == null) player = Docencia2FirstPersonPlayer.Instance ?? FindAnyObjectByType<Docencia2FirstPersonPlayer>();
+                if (switcher == null) return;
 
-            if (isTerror)
-            {
-                // Mantener bloqueadas todas las luces generales del interior y el derrame de luces exteriores cada cuadro
-                // (para que si el usuario o algún script toca el switcher en vivo, nunca se vuelvan a prender las luces en TERROR)
-                EnforceInteriorLightsSuppressedEveryFrame();
-                ApplyCurrentAmbientAndInspectionFloor();
-            }
+                bool isTerror = (switcher.modoActual == Docencia2VisualMode.Terror);
+                bool isOutdoor = IsViewerOutdoor();
+                bool shouldApplyInteriorDarkness = isTerror && !isOutdoor;
 
-            UpdateAudioState(isTerror);
+                if (shouldApplyInteriorDarkness && !_darknessApplied)
+                {
+                    EnterExtremeTerrorDarkness();
+                }
+                else if (!shouldApplyInteriorDarkness && _darknessApplied)
+                {
+                    RestoreOriginalEnvironment();
+                }
+
+                if (shouldApplyInteriorDarkness)
+                {
+                    // Mantener bloqueadas todas las luces generales del interior y el derrame de luces exteriores cada cuadro
+                    // (para que si el usuario o algún script toca el switcher en vivo, nunca se vuelvan a prender las luces en TERROR interior)
+                    EnforceInteriorLightsSuppressedEveryFrame();
+                    ApplyCurrentAmbientAndInspectionFloor();
+                }
+
+                if (player != null && shouldApplyInteriorDarkness != _lastShadowsSuppressed)
+                {
+                    player.SyncSceneLightShadows(shouldApplyInteriorDarkness);
+                    _lastShadowsSuppressed = shouldApplyInteriorDarkness;
+                }
+
+                UpdateAudioState(shouldApplyInteriorDarkness);
+            }
+            finally
+            {
+                _inSync = false;
+            }
         }
 
         private void EnforceInteriorLightsSuppressedEveryFrame()
@@ -270,6 +328,7 @@ namespace Vaelith.Docencia2
             // 1. Apagar TODAS las luces interiores generales en TERROR (tanto de PB como de PA, en grupos NOCHE, TERROR, aulas, baños y auditorio)
             //    y forzar que Docencia2InteriorModeTracker no reactive los grupos de luces generales mientras el jugador esté en Oscuridad Extrema:
             _suppressedLegacyTerrorLights.Clear();
+            _suppressedTrackers.Clear();
             foreach (var tracker in FindObjectsByType<Docencia2InteriorModeTracker>(FindObjectsInactive.Include))
             {
                 if (tracker != null && tracker.enabled)
@@ -380,9 +439,9 @@ namespace Vaelith.Docencia2
             if (bloom != null)
             {
                 bloom.active = true;
-                bloom.threshold.Override(0.95f);
-                bloom.intensity.Override(0.35f);
-                bloom.scatter.Override(0.65f);
+                bloom.threshold.Override(1.38f);
+                bloom.intensity.Override(0.22f);
+                bloom.scatter.Override(0.55f);
             }
         }
 
@@ -437,22 +496,32 @@ namespace Vaelith.Docencia2
 
             _darknessApplied = false;
 
-            if (switcher != null)
+            bool prevInSync = _inSync;
+            _inSync = true;
+            try
             {
-                switcher.ApplyMode(switcher.modoActual, false);
-                foreach (var tracker in FindObjectsByType<Docencia2InteriorModeTracker>(FindObjectsInactive.Include))
+                if (switcher != null && gameObject.scene.isLoaded)
                 {
-                    if (tracker != null) tracker.SendMessage("Update", SendMessageOptions.DontRequireReceiver);
+                    switcher.ApplyMode(switcher.modoActual, false);
+                    foreach (var tracker in FindObjectsByType<Docencia2InteriorModeTracker>(FindObjectsInactive.Include))
+                    {
+                        if (tracker != null && tracker.gameObject.activeInHierarchy)
+                            tracker.SendMessage("Update", SendMessageOptions.DontRequireReceiver);
+                    }
+                }
+                else
+                {
+                    RenderSettings.ambientMode = _origAmbientMode;
+                    RenderSettings.ambientSkyColor = _origSky;
+                    RenderSettings.ambientEquatorColor = _origEquator;
+                    RenderSettings.ambientGroundColor = _origGround;
+                    RenderSettings.fogColor = _origFogColor;
+                    RenderSettings.fogDensity = _origFogDensity;
                 }
             }
-            else
+            finally
             {
-                RenderSettings.ambientMode = _origAmbientMode;
-                RenderSettings.ambientSkyColor = _origSky;
-                RenderSettings.ambientEquatorColor = _origEquator;
-                RenderSettings.ambientGroundColor = _origGround;
-                RenderSettings.fogColor = _origFogColor;
-                RenderSettings.fogDensity = _origFogDensity;
+                _inSync = prevInSync;
             }
         }
 
@@ -483,11 +552,11 @@ namespace Vaelith.Docencia2
                 RenderSettings.ambientEquatorColor = new Color(ambScalar * 0.78f, ambScalar * 1.02f, ambScalar * 1.20f, 1f);
                 RenderSettings.ambientGroundColor = new Color(ambScalar * 0.65f, ambScalar * 0.88f, ambScalar * 1.04f, 1f);
 
-                // Niebla interior fría y densa que engulle el fondo de los pasillos más allá de los 6 m de la linterna
+                // Niebla interior fría y densa que engulle el fondo de los pasillos más allá de los 7 m de la linterna
                 RenderSettings.fog = true;
                 RenderSettings.fogMode = FogMode.ExponentialSquared;
                 RenderSettings.fogColor = new Color(0.002f + ambScalar * 0.08f, 0.003f + ambScalar * 0.12f, 0.005f + ambScalar * 0.16f, 1f);
-                RenderSettings.fogDensity = 0.064f;
+                RenderSettings.fogDensity = 0.048f;
 
                 if (nearSilhouetteLight != null)
                 {

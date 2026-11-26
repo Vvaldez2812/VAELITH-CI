@@ -21,7 +21,6 @@ public static class AuditoriaPaso2Executor
     static Vector3 W(float x, float y, float z) => Docencia2InteriorBuilder.PlanToUnityPos(x, y, z);
     static string PathOf(Transform t) => t.parent ? PathOf(t.parent) + "/" + t.name : t.name;
 
-    [MenuItem("VAELITH/Auditoria Docencia 2/PASO 2 - Ejecutar Correccion Completa y Verificar")]
     public static void ExecuteAllMenu()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)

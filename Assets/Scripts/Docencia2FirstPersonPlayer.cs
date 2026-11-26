@@ -19,18 +19,23 @@ namespace Vaelith.Docencia2
     {
         public static Docencia2FirstPersonPlayer Instance { get; private set; }
 
-        [Header("Dimensiones y Movimiento (Paso 1)")]
-        public float standingHeight = 1.75f;
-        public float crouchingHeight = 1.15f;
+        [Header("Dimensiones y Movimiento (Personaje Principal 1.60 m)")]
+        public float standingHeight = 1.60f;
+        public float crouchingHeight = 1.05f;
         public float controllerRadius = 0.30f;
         public float controllerStepOffset = 0.30f;
-        public float standingCameraY = 1.65f;
-        public float crouchingCameraY = 1.05f;
+        public float standingCameraY = 1.48f;
+        public float crouchingCameraY = 0.96f;
         public float walkSpeed = 3.6f;
         public float runSpeed = 5.8f;
         public float crouchSpeed = 2.0f;
         public float mouseSensitivity = 0.14f;
         public float gravity = -18.0f;
+
+        [Header("Vista Primera / Tercera Persona (Tecla V)")]
+        public bool isThirdPersonView = false;
+        public KeyCode toggleViewKey = KeyCode.V;
+        public Docencia2PlayerRigDriver rigDriver;
 
         [Header("Cabeceo Sutil de Caminata")]
         public float bobFrequencyWalk = 8.5f;
@@ -42,20 +47,25 @@ namespace Vaelith.Docencia2
         public Camera playerCamera;
         public Transform phoneHandRoot;
         public Light phoneSpotLight;
+        public Light phoneScreenLight;
         public Renderer phoneFlashLedRenderer;
 
         [Header("Linterna de Celular (Tecla F - Óptica Realista 28° y Alcance ~7 m)")]
         public bool flashlightOn = true;
-        public float flashlightBaseIntensity = 95.0f;
-        public float flashlightRange = 7.8f;
-        public float flashlightOuterAngle = 30.0f;
-        public float flashlightInnerAngle = 12.0f;
+        public float flashlightBaseIntensity = 38.0f;
+        public float flashlightRange = 8.5f;
+        public float flashlightOuterAngle = 34.0f;
+        public float flashlightInnerAngle = 10.0f;
         [Range(0.4f, 2.0f)]
         public float flashlightPowerMultiplier = 1.0f;
         public Light flashlightSpillLight;
-        public float flashlightSpillBaseIntensity = 3.8f;
+        public float flashlightSpillBaseIntensity = 1.15f;
         public Renderer volumetricBeamRenderer;
-        public float volumetricBeamBaseAlpha = 0.032f;
+        public float volumetricBeamBaseAlpha = 0.018f;
+
+        [Header("Modo Depuración / QA")]
+        [Tooltip("Si está desactivado, oculta la barra superior técnica y desactiva los atajos T, G, B y 1..8.")]
+        public bool showDebugHudAndShortcuts = false;
 
         [Header("Batería de Celular (Opcional: 6 a 8 minutos)")]
         public bool enableBatteryDrain = true;
@@ -68,6 +78,8 @@ namespace Vaelith.Docencia2
         public bool IsDoorPanelOpen { get => _showDoorPanel; set => _showDoorPanel = value; }
         public bool IsPaused { get => _isPaused; set => _isPaused = value; }
         public float BatteryPercent01 => batteryTotalDurationSeconds > 0.01f ? Mathf.Clamp01(batteryRemainingSeconds / batteryTotalDurationSeconds) : 1.0f;
+        public float CurrentAnimSpeed01 => _currentAnimSpeed01;
+        public bool IsCrouchingState => _isCrouchingState;
 
         [Header("Interacción con Puertas (Tecla E)")]
         public float interactionDistance = 3.0f;
@@ -76,13 +88,22 @@ namespace Vaelith.Docencia2
         private float _pitch = 0f;
         private float _verticalVelocity = 0f;
         private float _bobTimer = 0f;
-        private float _currentHeight = 1.75f;
-        private float _currentCamY = 1.65f;
-        private Vector3 _phoneBaseLocalPos = new Vector3(0.24f, -0.21f, 0.38f);
-        private Quaternion _phoneBaseLocalRot = Quaternion.Euler(6f, -8f, 2f);
+        private float _currentHeight = 1.60f;
+        private float _currentCamY = 1.48f;
+        private float _currentAnimSpeed01 = 0f;
+        private bool _isCrouchingState = false;
+        private float _thirdPersonBlend = 0f;
+        private float _phoneFlashBlend = 1f;
+        private Vector3 _phoneBaseLocalPos = new Vector3(0.180f, -0.130f, 0.335f);
+        private Vector3 _phoneOffLocalPos = new Vector3(0.190f, -0.165f, 0.320f);
+        private Quaternion _phoneBaseLocalRot = Quaternion.Euler(4f, -14f, 3f);
+        private Quaternion _phoneOffLocalRot = Quaternion.Euler(14f, -16f, 6f);
+        private Material _flashLedMatInstance;
 
         private bool _isPaused = false;
         private bool _showDoorPanel = false;
+        private bool _crouchToggle = false;
+        private readonly Dictionary<Light, LightShadows> _originalLightShadows = new Dictionary<Light, LightShadows>();
         private Vector2 _doorPanelScroll = Vector2.zero;
         private string _lastReportMessage = "";
         private Docencia2InteractiveDoor _hoveredDoor;
@@ -180,18 +201,7 @@ namespace Vaelith.Docencia2
         {
             ConfigureCharacterController();
             EnsureRealisticFlashlightRig();
-            if (phoneSpotLight != null)
-            {
-                // Garantizar que ninguna otra luz de la escena tenga sombras activas para que la linterna sea la ÚNICA luz con sombras
-                foreach (var l in FindObjectsByType<Light>(FindObjectsInactive.Include))
-                {
-                    if (l != phoneSpotLight && l.shadows != LightShadows.None)
-                    {
-                        l.shadows = LightShadows.None;
-                    }
-                }
-                SetFlashlightState(flashlightOn, false);
-            }
+            CacheOriginalSceneLightShadows();
 
             // Desactivar las cámaras fijas de referencia en Play para que la vista sea la del jugador (sin alterar sus componentes ni posiciones para renders de regresión)
             var refCams = GameObject.Find("Camaras_Referencia_Docencia2");
@@ -204,13 +214,52 @@ namespace Vaelith.Docencia2
                 }
             }
 
+            if (rigDriver == null) rigDriver = GetComponentInChildren<Docencia2PlayerRigDriver>(true);
+            _thirdPersonBlend = isThirdPersonView ? 1f : 0f;
+            _phoneFlashBlend = flashlightOn ? 1f : 0f;
+
             if (playerCamera != null)
             {
                 playerCamera.enabled = true;
             }
+            if (rigDriver != null)
+            {
+                rigDriver.InitializeRefs();
+                rigDriver.SyncRendererVisibility(force: true);
+            }
+
+            if (phoneSpotLight != null)
+            {
+                SetFlashlightState(flashlightOn, false);
+            }
 
             LockCursor(true);
-            RunDoorAuditAndPopulateList(saveFiles: true);
+        }
+
+        public void CacheOriginalSceneLightShadows()
+        {
+            foreach (var l in FindObjectsByType<Light>(FindObjectsInactive.Include))
+            {
+                if (l == null || l == phoneSpotLight || l == flashlightSpillLight) continue;
+                if (!_originalLightShadows.ContainsKey(l))
+                {
+                    _originalLightShadows[l] = l.shadows;
+                }
+            }
+        }
+
+        public void SyncSceneLightShadows(bool onlyFlashlightCastsShadows)
+        {
+            if (_originalLightShadows.Count == 0)
+            {
+                CacheOriginalSceneLightShadows();
+            }
+
+            foreach (var kv in _originalLightShadows)
+            {
+                if (kv.Key == null || kv.Key == phoneSpotLight || kv.Key == flashlightSpillLight) continue;
+                kv.Key.shadows = onlyFlashlightCastsShadows ? LightShadows.None : kv.Value;
+            }
         }
 
         public void ConfigureCharacterController()
@@ -236,16 +285,16 @@ namespace Vaelith.Docencia2
             if (kb.escapeKey.wasPressedThisFrame)
             {
                 _isPaused = !_isPaused;
-                LockCursor(!_isPaused && !_showDoorPanel);
+                LockCursor(!_isPaused && !(showDebugHudAndShortcuts && _showDoorPanel));
             }
 
-            // 2. Panel de prueba de puertas con tecla G
-            if (kb.gKey.wasPressedThisFrame)
+            // 2. Panel de prueba de puertas con tecla G (solo en modo depuración/QA)
+            if (showDebugHudAndShortcuts && kb.gKey.wasPressedThisFrame)
             {
                 _showDoorPanel = !_showDoorPanel;
                 if (_showDoorPanel)
                 {
-                    RunDoorAuditAndPopulateList(saveFiles: true);
+                    RunDoorAuditAndPopulateList(saveFiles: false);
                 }
                 if (Docencia2TerrorDarknessController.Instance != null)
                 {
@@ -276,13 +325,24 @@ namespace Vaelith.Docencia2
                 }
             }
 
-            // 4. Atajos de teletransporte (Teclas 1..8)
-            foreach (var tp in _teleports)
+            // 3b. Alternar vista 1ª / 3ª persona con tecla V (permite ver el cuerpo completo de 1.60 m)
+            if (kb.vKey.wasPressedThisFrame)
             {
-                if (kb[tp.key].wasPressedThisFrame)
+                isThirdPersonView = !isThirdPersonView;
+                if (rigDriver != null) rigDriver.SyncRendererVisibility(force: true);
+            }
+            _thirdPersonBlend = Mathf.MoveTowards(_thirdPersonBlend, isThirdPersonView ? 1f : 0f, Time.deltaTime * 6.5f);
+
+            // 4. Atajos de teletransporte (Teclas 1..8, solo en modo depuración/QA)
+            if (showDebugHudAndShortcuts)
+            {
+                foreach (var tp in _teleports)
                 {
-                    if (tp.y > 2.0f && GameObject.Find("PA_Interior") == null) continue;
-                    TeleportToPlan(tp.planX, tp.y, tp.planZ, tp.yaw);
+                    if (kb[tp.key].wasPressedThisFrame)
+                    {
+                        if (tp.y > 2.0f && GameObject.Find("PA_Interior") == null) continue;
+                        TeleportToPlan(tp.planX, tp.y, tp.planZ, tp.yaw);
+                    }
                 }
             }
 
@@ -295,7 +355,7 @@ namespace Vaelith.Docencia2
             if (_isPaused) return;
 
             // 7. Mirar con el mouse (cuando el cursor está bloqueado)
-            if (mouse != null && !_showDoorPanel)
+            if (mouse != null && !(showDebugHudAndShortcuts && _showDoorPanel))
             {
                 if (mouse.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked)
                 {
@@ -310,20 +370,41 @@ namespace Vaelith.Docencia2
 
                     transform.Rotate(0f, yawDelta, 0f);
                     _pitch = Mathf.Clamp(_pitch - pitchDelta, -82f, 82f);
-                    if (playerCamera != null)
-                    {
-                        playerCamera.transform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
-                    }
                 }
             }
 
-            // 8. Movimiento WASD + Shift (correr) + Ctrl (agacharse)
+            // 8. Movimiento WASD + Shift (correr) + Ctrl/C (agacharse)
             UpdateMovement(kb, Time.deltaTime);
+
+            // 9. Posicionar cámara suavemente (1ª persona con cuerpo visible o 3ª persona anti-colisión)
+            UpdateCameraView();
+        }
+
+        private bool HasLowCeilingOverhead()
+        {
+            float r = Mathf.Max(0.18f, controllerRadius - 0.06f);
+            Vector3 origin = transform.position + Vector3.up * (crouchingHeight - r);
+            float checkDist = (standingHeight - crouchingHeight) + 0.06f;
+            var hits = Physics.SphereCastAll(origin, r, Vector3.up, checkDist, ~0, QueryTriggerInteraction.Ignore);
+            foreach (var h in hits)
+            {
+                if (h.collider == null || h.collider == _cc || h.collider.transform.IsChildOf(transform)) continue;
+                return true;
+            }
+            return false;
         }
 
         private void UpdateMovement(Keyboard kb, float dt)
         {
-            bool wantsCrouch = kb.leftCtrlKey.isPressed || kb.rightCtrlKey.isPressed;
+            bool holdingCtrl = kb.leftCtrlKey.isPressed || kb.rightCtrlKey.isPressed;
+            if (kb.cKey.wasPressedThisFrame) _crouchToggle = !_crouchToggle;
+            if (holdingCtrl) _crouchToggle = false;
+
+            bool wantsCrouch = holdingCtrl || _crouchToggle;
+            if (!wantsCrouch && _currentHeight < standingHeight - 0.05f && HasLowCeilingOverhead())
+            {
+                wantsCrouch = true;
+            }
             bool wantsRun = (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed) && !wantsCrouch;
 
             float targetH = wantsCrouch ? crouchingHeight : standingHeight;
@@ -357,36 +438,63 @@ namespace Vaelith.Docencia2
             Vector3 actualDisp = transform.position - prevPos;
             Vector2 horizDisp = new Vector2(actualDisp.x, actualDisp.z);
             float horizSpeed = dt > 0.0001f ? horizDisp.magnitude / dt : 0f;
+            _isCrouchingState = wantsCrouch;
+            _currentAnimSpeed01 = runSpeed > 0.01f ? Mathf.Clamp01(horizSpeed / runSpeed) : 0f;
 
             // Cabeceo sutil de caminata (sin mareo) y sonido de pasos sobre loseta
-            if (playerCamera != null)
+            if (_cc.isGrounded && input.sqrMagnitude > 0.05f && horizSpeed > 0.4f)
             {
-                if (_cc.isGrounded && input.sqrMagnitude > 0.05f && horizSpeed > 0.4f)
+                float freq = wantsRun ? bobFrequencyRun : bobFrequencyWalk;
+                _bobTimer += dt * freq;
+                _stepDistanceAccumulator += horizDisp.magnitude;
+                float stepThreshold = wantsRun ? 1.55f : (wantsCrouch ? 1.15f : 1.30f);
+                if (_stepDistanceAccumulator >= stepThreshold)
                 {
-                    float freq = wantsRun ? bobFrequencyRun : bobFrequencyWalk;
-                    _bobTimer += dt * freq;
-                    float bobY = Mathf.Sin(_bobTimer) * bobAmplitudeY * (wantsCrouch ? 0.5f : 1f);
-                    float bobX = Mathf.Cos(_bobTimer * 0.5f) * bobAmplitudeX * (wantsCrouch ? 0.5f : 1f);
-                    playerCamera.transform.localPosition = new Vector3(bobX, _currentCamY + bobY, 0f);
-
-                    _stepDistanceAccumulator += horizDisp.magnitude;
-                    float stepThreshold = wantsRun ? 1.55f : (wantsCrouch ? 1.15f : 1.30f);
-                    if (_stepDistanceAccumulator >= stepThreshold)
-                    {
-                        _stepDistanceAccumulator = 0f;
-                        PlayFootstepSound(wantsRun ? 0.32f : 0.22f);
-                    }
-                }
-                else
-                {
-                    _bobTimer = 0f;
-                    playerCamera.transform.localPosition = Vector3.Lerp(
-                        playerCamera.transform.localPosition,
-                        new Vector3(0f, _currentCamY, 0f),
-                        dt * 10f
-                    );
+                    _stepDistanceAccumulator = 0f;
+                    PlayFootstepSound(wantsRun ? 0.32f : 0.22f);
                 }
             }
+            else
+            {
+                _bobTimer = 0f;
+            }
+        }
+
+        private void UpdateCameraView()
+        {
+            if (playerCamera == null) return;
+
+            bool walking = _currentAnimSpeed01 > 0.08f;
+            float bobY = walking ? Mathf.Sin(_bobTimer) * bobAmplitudeY * (_isCrouchingState ? 0.5f : 1f) : 0f;
+            float bobX = walking ? Mathf.Cos(_bobTimer * 0.5f) * bobAmplitudeX * (_isCrouchingState ? 0.5f : 1f) : 0f;
+
+            if (_thirdPersonBlend < 0.005f)
+            {
+                playerCamera.transform.localPosition = new Vector3(bobX, _currentCamY + bobY, 0.065f);
+                playerCamera.transform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+                return;
+            }
+
+            Quaternion aimRot = transform.rotation * Quaternion.Euler(_pitch, 0f, 0f);
+            Vector3 pivot = transform.TransformPoint(new Vector3(bobX * 0.35f, _currentCamY + bobY * 0.35f, 0.065f));
+            Vector3 desiredWorld = pivot + aimRot * (new Vector3(0.36f, 0.14f, -1.65f) * _thirdPersonBlend);
+
+            Vector3 dir = desiredWorld - pivot;
+            float dist = dir.magnitude;
+            if (dist > 0.01f)
+            {
+                float safeDist = dist;
+                var hits = Physics.SphereCastAll(pivot, 0.14f, dir / dist, dist, ~0, QueryTriggerInteraction.Ignore);
+                foreach (var h in hits)
+                {
+                    if (h.collider == null || h.collider.transform.IsChildOf(transform)) continue;
+                    if (h.distance < safeDist) safeDist = Mathf.Max(0.22f, h.distance - 0.06f);
+                }
+                desiredWorld = pivot + (dir / dist) * safeDist;
+            }
+
+            playerCamera.transform.position = desiredWorld;
+            playerCamera.transform.rotation = aimRot;
         }
 
         // ====================================================================
@@ -413,14 +521,14 @@ namespace Vaelith.Docencia2
                     float outerWeight = Mathf.SmoothStep(0.32f, 0.88f, distRaw);
                     float r = Mathf.Max(0f, distRaw + (petalRipple + orgNoise + microLens) * outerWeight);
 
-                    // 1) Hotspot central realista tipo LED (gaussiano concentrado y brillante en el centro)
-                    float hotspot = Mathf.Exp(-(r * r) / (0.24f * 0.24f));
+                    // 1) Hotspot central realista tipo LED (gaussiano suave para evitar destello blanco quemado)
+                    float hotspot = Mathf.Exp(-(r * r) / (0.34f * 0.34f));
                     // 2) Corona suave del reflector (cae progresivamente hacia los bordes sin aros duros artificiales)
-                    float corona = Mathf.Pow(Mathf.Clamp01(1.0f - Mathf.SmoothStep(0.06f, 0.95f, r)), 1.55f);
+                    float corona = Mathf.Pow(Mathf.Clamp01(1.0f - Mathf.SmoothStep(0.06f, 0.96f, r)), 1.45f);
                     // 3) Fundido limpio al borde exterior
-                    float edgeFade = Mathf.Pow(Mathf.Clamp01((0.97f - r) / 0.26f), 1.25f);
+                    float edgeFade = Mathf.Pow(Mathf.Clamp01((0.98f - r) / 0.28f), 1.25f);
 
-                    float val = Mathf.Clamp01((hotspot * 0.58f + corona * 0.42f) * edgeFade);
+                    float val = Mathf.Clamp01((hotspot * 0.36f + corona * 0.64f) * edgeFade);
                     pixels[y * size + x] = new Color(val, val, val, val);
                 }
             }
@@ -518,11 +626,11 @@ namespace Vaelith.Docencia2
         {
             if (phoneSpotLight == null) return;
 
-            // Calibrar parámetros ópticos realistas si venía de una escena anterior con valores bajos
-            if (flashlightBaseIntensity < 85f) flashlightBaseIntensity = 95.0f;
-            if (flashlightRange < 7.2f) flashlightRange = 7.8f;
-            flashlightOuterAngle = 30.0f;
-            flashlightInnerAngle = 12.0f;
+            // Calibrar parámetros ópticos realistas sin sobrescribir la calibración suave configurada en escena
+            flashlightBaseIntensity = Mathf.Clamp(flashlightBaseIntensity, 10f, 120f);
+            if (flashlightRange < 6.5f) flashlightRange = 8.5f;
+            flashlightOuterAngle = Mathf.Clamp(flashlightOuterAngle, 22f, 45f);
+            flashlightInnerAngle = Mathf.Clamp(flashlightInnerAngle, 6f, flashlightOuterAngle - 6f);
             flashlightPowerMultiplier = Mathf.Clamp(flashlightPowerMultiplier, 0.4f, 2.0f);
 
             phoneSpotLight.type = LightType.Spot;
@@ -567,10 +675,33 @@ namespace Vaelith.Docencia2
             flashlightSpillLight.range = 4.6f;
             flashlightSpillLight.intensity = flashlightSpillBaseIntensity;
             flashlightSpillLight.shadows = LightShadows.None;
-            flashlightSpillLight.cullingMask = (1 << 8) | (1 << 30);
+            flashlightSpillLight.cullingMask = (1 << 0) | (1 << 8) | (1 << 28) | (1 << 30);
             var spillUld = spillT.GetComponent<UniversalAdditionalLightData>();
             if (spillUld == null) spillUld = spillT.gameObject.AddComponent<UniversalAdditionalLightData>();
             spillUld.renderingLayers = uint.MaxValue;
+
+            // 1b) Micro-luz tenue de la pantalla OLED (solo activa con linterna encendida y sin generar reflejo de foco en el cristal)
+            if (phoneHandRoot != null)
+            {
+                Transform screenLightT = phoneHandRoot.Find("Luz_Pantalla_OLED");
+                if (screenLightT == null)
+                {
+                    var slGo = new GameObject("Luz_Pantalla_OLED");
+                    slGo.transform.SetParent(phoneHandRoot, false);
+                    screenLightT = slGo.transform;
+                }
+                screenLightT.localPosition = new Vector3(0f, 0.02f, -0.14f);
+                var sLight = screenLightT.GetComponent<Light>();
+                if (sLight == null) sLight = screenLightT.gameObject.AddComponent<Light>();
+                sLight.type = LightType.Point;
+                sLight.color = new Color(0.60f, 0.80f, 1.0f, 1f);
+                sLight.range = 0.55f;
+                sLight.intensity = flashlightOn ? 0.028f : 0f;
+                sLight.enabled = flashlightOn;
+                sLight.shadows = LightShadows.None;
+                sLight.cullingMask = ~0;
+                phoneScreenLight = sLight;
+            }
 
             // 2) Haz volumétrico sutil en el aire frente al celular (muy tenue para dar profundidad sin tapar la vista)
             Transform beamT = phoneSpotLight.transform.Find("Haz_Volumetrico_Linterna");
@@ -649,17 +780,41 @@ namespace Vaelith.Docencia2
             }
             if (phoneFlashLedRenderer != null && phoneFlashLedRenderer.sharedMaterial != null)
             {
-                var mpb = new MaterialPropertyBlock();
-                phoneFlashLedRenderer.GetPropertyBlock(mpb);
-                Color c = flashlightOn ? new Color(0.92f, 0.96f, 1.0f, 1f) * (3.2f * Mathf.Clamp(eff, 0.15f, 1.5f)) : new Color(0.15f, 0.16f, 0.18f, 1f);
-                mpb.SetColor("_BaseColor", c);
-                mpb.SetColor("_EmissionColor", c);
-                phoneFlashLedRenderer.SetPropertyBlock(mpb);
+                if (_flashLedMatInstance == null && Application.isPlaying)
+                {
+                    _flashLedMatInstance = phoneFlashLedRenderer.material;
+                }
+
+                Material targetMat = _flashLedMatInstance != null ? _flashLedMatInstance : phoneFlashLedRenderer.sharedMaterial;
+                bool ledLit = flashlightOn && eff > 0.01f;
+                if (ledLit)
+                {
+                    Color onColor = new Color(0.95f, 0.98f, 1.0f, 1f);
+                    Color onEmissive = onColor * (2.0f * Mathf.Clamp(eff, 0.15f, 1.5f));
+                    targetMat.SetColor("_BaseColor", onColor);
+                    targetMat.SetColor("_EmissionColor", onEmissive);
+                    targetMat.EnableKeyword("_EMISSION");
+                }
+                else
+                {
+                    targetMat.SetColor("_BaseColor", new Color(0.10f, 0.11f, 0.13f, 1f));
+                    targetMat.SetColor("_EmissionColor", Color.black);
+                    targetMat.DisableKeyword("_EMISSION");
+                }
+                phoneFlashLedRenderer.SetPropertyBlock(null);
+            }
+            if (phoneScreenLight != null)
+            {
+                bool on = flashlightOn && eff > 0.01f;
+                phoneScreenLight.enabled = on;
+                phoneScreenLight.intensity = on ? 0.028f * Mathf.Clamp(eff, 0.2f, 1.2f) : 0f;
             }
         }
 
         private void UpdateHandAndFlashlight(float time, float dt)
         {
+            _phoneFlashBlend = Mathf.MoveTowards(_phoneFlashBlend, flashlightOn ? 1f : 0f, dt * 7.0f);
+
             if (phoneHandRoot != null)
             {
                 // Inercia física realista de la mano al girar la cámara + balanceo sutil de respiración/paso
@@ -672,16 +827,32 @@ namespace Vaelith.Docencia2
                 );
                 _smoothedLookSway = Vector2.Lerp(_smoothedLookSway, targetSway, 1f - Mathf.Exp(-dt * 11f));
 
-                float swayX = (Mathf.PerlinNoise(time * 1.4f, 1.7f) - 0.5f) * 0.008f - _smoothedLookSway.x * 0.0045f;
-                float swayY = (Mathf.PerlinNoise(time * 1.8f, 5.3f) - 0.5f) * 0.010f - _smoothedLookSway.y * 0.0040f;
-                float rotPitch = (Mathf.PerlinNoise(time * 2.1f, 9.1f) - 0.5f) * 1.4f + _smoothedLookSway.y * 1.15f;
-                float rotYaw = (Mathf.PerlinNoise(time * 1.6f, 13.4f) - 0.5f) * 1.2f - _smoothedLookSway.x * 1.25f;
-                float rotRoll = -_smoothedLookSway.x * 0.9f;
+                float swayX = (Mathf.PerlinNoise(time * 1.4f, 1.7f) - 0.5f) * 0.006f - _smoothedLookSway.x * 0.0040f;
+                float swayY = (Mathf.PerlinNoise(time * 1.8f, 5.3f) - 0.5f) * 0.008f - _smoothedLookSway.y * 0.0035f;
+                float rotPitch = (Mathf.PerlinNoise(time * 2.1f, 9.1f) - 0.5f) * 1.1f + _smoothedLookSway.y * 1.0f;
+                float rotYaw = (Mathf.PerlinNoise(time * 1.6f, 13.4f) - 0.5f) * 1.0f - _smoothedLookSway.x * 1.1f;
+                float rotRoll = -_smoothedLookSway.x * 0.8f;
 
                 float walkBobY = Mathf.Sin(_bobTimer) * 0.009f;
                 float walkBobX = Mathf.Cos(_bobTimer * 0.5f) * 0.005f;
-                phoneHandRoot.localPosition = _phoneBaseLocalPos + new Vector3(swayX + walkBobX, swayY + walkBobY, 0f);
-                phoneHandRoot.localRotation = _phoneBaseLocalRot * Quaternion.Euler(rotPitch, rotYaw, rotRoll);
+                Vector3 basePos = Vector3.Lerp(_phoneOffLocalPos, _phoneBaseLocalPos, _phoneFlashBlend);
+                Quaternion baseRot = Quaternion.Slerp(_phoneOffLocalRot, _phoneBaseLocalRot, _phoneFlashBlend);
+                Vector3 localHandPos = basePos + new Vector3(swayX + walkBobX, swayY + walkBobY, 0f);
+                Quaternion localHandRot = baseRot * Quaternion.Euler(rotPitch, rotYaw, rotRoll);
+
+                if (_thirdPersonBlend < 0.005f)
+                {
+                    phoneHandRoot.localPosition = localHandPos;
+                    phoneHandRoot.localRotation = localHandRot;
+                }
+                else
+                {
+                    float clampedArmPitch = Mathf.Clamp(_pitch, -34f, 42f);
+                    Vector3 eyePivotWorld = transform.TransformPoint(new Vector3(0f, _currentCamY, 0.065f));
+                    Quaternion aimRot = transform.rotation * Quaternion.Euler(clampedArmPitch, 0f, 0f);
+                    phoneHandRoot.position = eyePivotWorld + aimRot * localHandPos;
+                    phoneHandRoot.rotation = aimRot * localHandRot;
+                }
             }
 
             if (phoneSpotLight != null && flashlightOn)
@@ -742,19 +913,27 @@ namespace Vaelith.Docencia2
             if (playerCamera == null) return;
 
             Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            if (Physics.Raycast(ray, out RaycastHit hit, interactionDistance, ~0, QueryTriggerInteraction.Ignore))
+            float rayRange = interactionDistance + _thirdPersonBlend * 1.65f;
+            if (Physics.Raycast(ray, out RaycastHit hit, rayRange, ~0, QueryTriggerInteraction.Ignore))
             {
                 var door = hit.collider.GetComponentInParent<Docencia2InteractiveDoor>();
                 if (door != null)
                 {
                     _hoveredDoor = door;
                     string shortName = FormatShortDoorName(door.transform);
-                    string action = door.isOpen ? "Cerrar" : "Abrir";
-                    _hoveredDoorLabel = $"[E] {action} {shortName}";
-
-                    if (kb.eKey.wasPressedThisFrame)
+                    if (door.isLocked)
                     {
-                        door.Toggle(playerCamera.transform.position);
+                        _hoveredDoorLabel = $"[Cerrado con llave] {shortName}";
+                    }
+                    else
+                    {
+                        string action = door.isOpen ? "Cerrar" : "Abrir";
+                        _hoveredDoorLabel = $"[E] {action} {shortName}";
+
+                        if (kb.eKey.wasPressedThisFrame)
+                        {
+                            door.Toggle(playerCamera.transform.position);
+                        }
                     }
                 }
             }
@@ -782,6 +961,7 @@ namespace Vaelith.Docencia2
             _verticalVelocity = 0f;
             _cc.enabled = wasEnabled;
             Physics.SyncTransforms();
+            UpdateCameraView();
         }
 
         private void LockCursor(bool locked)
@@ -818,7 +998,11 @@ namespace Vaelith.Docencia2
                 var blockers = new HashSet<string>();
                 bool angleOk = true;
 
-                if (col != null)
+                if (d.isLocked)
+                {
+                    d.SetOpen(false, false);
+                }
+                else if (col != null)
                 {
                     foreach (bool rev in d.doubleSwing ? new[] { false, true } : new[] { false })
                     {
@@ -834,7 +1018,7 @@ namespace Vaelith.Docencia2
                             foreach (var other in hits)
                             {
                                 if (other == col || other == _cc || other.transform.IsChildOf(transform)) continue;
-                                if (other.transform.IsChildOf(d.transform.parent) || !other.enabled) continue;
+                                if (other.transform.IsChildOf(d.transform) || !other.enabled) continue;
 
                                 if (Physics.ComputePenetration(
                                     col, col.transform.position, col.transform.rotation,
@@ -865,10 +1049,12 @@ namespace Vaelith.Docencia2
                 Vector2 pPos = UnityToPlanXZ(wPos);
                 string floor = wPos.y > 2.0f ? "PA" : "PB";
 
-                bool passed = angleOk && blockers.Count == 0;
-                string statusText = passed
-                    ? (d.doubleSwing ? "ABRE OK (Vaivén ±90°)" : "ABRE OK (90° Interior)")
-                    : (!angleOk ? "NO ABRE 90°" : "ATRAVIESA / SE TRABA: " + string.Join(" | ", blockers));
+                bool passed = d.isLocked || (angleOk && blockers.Count == 0);
+                string statusText = d.isLocked
+                    ? "CERRADA CON LLAVE (Bloqueada intencionalmente)"
+                    : (passed
+                        ? (d.doubleSwing ? "ABRE OK (Vaivén ±90°)" : "ABRE OK (90° Interior)")
+                        : (!angleOk ? "NO ABRE 90°" : "ATRAVIESA / SE TRABA: " + string.Join(" | ", blockers)));
 
                 doorTestEntries.Add(new DoorTestEntry
                 {
@@ -1054,31 +1240,44 @@ namespace Vaelith.Docencia2
                 GUI.Box(new Rect(cx - 230f, cy + 26f, 460f, 42f), _hoveredDoorLabel, promptStyle);
             }
 
-            // 2. Barra superior de controles grande y clara
-            float barW = Mathf.Min(vw - 24f, 1520f);
-            GUI.Box(
-                new Rect((vw - barW) * 0.5f, 10f, barW, 42f),
-                $"Modo: {modeName} [T]  |  Linterna: {(flashlightOn ? "ENCENDIDA" : "APAGADA")} ({batPct}%) [F]  |  Brillo: {brightPct} [B]  |  Puerta [E]  |  Puertas [G]  |  Pausa [Esc]  |  {planta} ({pxz.x:F1}, {pxz.y:F1})",
-                topBarStyle
-            );
+            // 2. Barra superior de controles (solo visible en modo depuración/QA)
+            if (showDebugHudAndShortcuts)
+            {
+                float barW = Mathf.Min(vw - 24f, 1520f);
+                GUI.Box(
+                    new Rect((vw - barW) * 0.5f, 10f, barW, 42f),
+                    $"Modo: {modeName} [T]  |  Linterna: {(flashlightOn ? "ENCENDIDA" : "APAGADA")} ({batPct}%) [F]  |  Brillo: {brightPct} [B]  |  Puerta [E]  |  Puertas [G]  |  Pausa [Esc]  |  {planta} ({pxz.x:F1}, {pxz.y:F1})",
+                    topBarStyle
+                );
+            }
 
             // 3. Menú de Pausa (Esc) Grande y Legible
             if (_isPaused)
             {
                 float mw = 680f;
-                float mh = 515f;
+                float mh = (showDebugHudAndShortcuts ? 560f : 440f);
                 Rect pauseRect = new Rect(cx - mw * 0.5f, cy - mh * 0.5f, mw, mh);
-                GUI.Box(pauseRect, "PAUSA — VAELITH DOCENCIA 2", panelBoxStyle);
+                GUI.Box(pauseRect, "PAUSA — VAELITH DOCENCIA 2 (Protagonista: 1.60 m)", panelBoxStyle);
 
                 float xLeft = pauseRect.x + 34f;
                 float contentW = mw - 68f;
                 float yCur = pauseRect.y + 58f;
 
+                if (GUI.Button(new Rect(xLeft, yCur, contentW, 42f), $"Vista: {(isThirdPersonView ? "3ª Persona (Cuerpo 1.60 m)" : "1ª Persona (Ojos 1.48 m)")}  [Tecla V]", buttonBigStyle))
+                {
+                    isThirdPersonView = !isThirdPersonView;
+                    if (rigDriver != null) rigDriver.SyncRendererVisibility(force: true);
+                }
+                yCur += 52f;
+
                 if (darkness != null)
                 {
+                    string brightLbl = showDebugHudAndShortcuts
+                        ? $"Brillo ambiente [Tecla B]:  {Mathf.RoundToInt(darkness.brightnessLevel * 100f)}%"
+                        : $"Brillo ambiente:  {Mathf.RoundToInt(darkness.brightnessLevel * 100f)}%";
                     GUI.Label(
                         new Rect(xLeft, yCur, contentW, 28f),
-                        $"Brillo ambiente [Tecla B]:  {Mathf.RoundToInt(darkness.brightnessLevel * 100f)}%",
+                        brightLbl,
                         labelBigStyle
                     );
                     yCur += 30f;
@@ -1099,7 +1298,7 @@ namespace Vaelith.Docencia2
                     yCur += 46f;
                 }
 
-                // Control en vivo de potencia de la linterna realista para ir probando
+                // Control en vivo de potencia de la linterna
                 GUI.Label(
                     new Rect(xLeft, yCur, contentW, 28f),
                     $"Potencia de Linterna Celular:  {Mathf.RoundToInt(flashlightPowerMultiplier * 100f)}%",
@@ -1144,29 +1343,32 @@ namespace Vaelith.Docencia2
                     yCur += 14f;
                 }
 
-                if (GUI.Button(new Rect(xLeft, yCur, contentW, 46f), $"Cambiar Modo Visual (Actual: {(isTerrorMode ? "TERROR" : "NOCHE")}) [Tecla T]", buttonBigStyle))
+                if (showDebugHudAndShortcuts)
                 {
-                    if (switcher != null) switcher.ToggleMode();
-                    if (darkness != null) darkness.SyncState();
-                }
-                yCur += 56f;
+                    if (GUI.Button(new Rect(xLeft, yCur, contentW, 46f), $"Cambiar Modo Visual (Actual: {(isTerrorMode ? "TERROR" : "NOCHE")}) [Tecla T]", buttonBigStyle))
+                    {
+                        if (switcher != null) switcher.ToggleMode();
+                        if (darkness != null) darkness.SyncState();
+                    }
+                    yCur += 56f;
 
-                if (GUI.Button(new Rect(xLeft, yCur, contentW, 46f), "Abrir / Cerrar Panel de Prueba de Puertas [Tecla G]", buttonBigStyle))
-                {
-                    _showDoorPanel = !_showDoorPanel;
-                    if (darkness != null) darkness.ApplyCurrentAmbientAndInspectionFloor();
+                    if (GUI.Button(new Rect(xLeft, yCur, contentW, 46f), "Abrir / Cerrar Panel de Prueba de Puertas [Tecla G]", buttonBigStyle))
+                    {
+                        _showDoorPanel = !_showDoorPanel;
+                        if (darkness != null) darkness.ApplyCurrentAmbientAndInspectionFloor();
+                    }
+                    yCur += 56f;
                 }
-                yCur += 56f;
 
                 if (GUI.Button(new Rect(xLeft, yCur, contentW, 48f), "Reanudar Partida [Esc]", buttonBigStyle))
                 {
                     _isPaused = false;
-                    LockCursor(!_showDoorPanel);
+                    LockCursor(!(showDebugHudAndShortcuts && _showDoorPanel));
                 }
             }
 
-            // 4. Panel de Prueba de Puertas (Tecla G) Grande y Legible
-            if (_showDoorPanel)
+            // 4. Panel de Prueba de Puertas (Tecla G, solo en modo depuración/QA)
+            if (showDebugHudAndShortcuts && _showDoorPanel)
             {
                 float pw = Mathf.Min(1160f, vw - 40f);
                 float ph = Mathf.Min(720f, vh - 80f);

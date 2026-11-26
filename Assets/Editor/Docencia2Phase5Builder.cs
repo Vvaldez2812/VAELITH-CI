@@ -21,7 +21,6 @@ namespace Vaelith.Docencia2
         static Dictionary<string, Material> mats;
         static Dictionary<string, GameObject> prototypes;
 
-        [MenuItem("VAELITH/Interior Docencia 2/FASE 5 - Mobiliario PB aprobado (sin reconstruir arquitectura)")]
         public static void Build()
         {
             if(EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Salir de Play antes de construir.");

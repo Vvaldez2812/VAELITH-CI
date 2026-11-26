@@ -22,7 +22,6 @@ public static class Paso1JugadorBuilder
 
     static Vector3 W(float x, float y, float z) => Docencia2InteriorBuilder.PlanToUnityPos(x, y, z);
 
-    [MenuItem("VAELITH/Terror Docencia 2/PASO 1 y OSCURIDAD EXTREMA - Construir y Verificar")]
     public static void BuildPlayerInSceneMenu()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -89,17 +88,17 @@ public static class Paso1JugadorBuilder
         playerRoot.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
 
         var cc = playerRoot.AddComponent<CharacterController>();
-        cc.height = 1.75f;
+        cc.height = 1.60f;
         cc.radius = 0.30f;
         cc.stepOffset = 0.30f;
         cc.slopeLimit = 50f;
         cc.skinWidth = 0.03f;
-        cc.center = new Vector3(0f, 0.875f, 0f);
+        cc.center = new Vector3(0f, 0.80f, 0f);
 
         GameObject camGo = new GameObject("Camara_PrimeraPersona_1.65m");
         camGo.tag = "MainCamera";
         camGo.transform.SetParent(playerRoot.transform, false);
-        camGo.transform.localPosition = new Vector3(0f, 1.65f, 0f);
+        camGo.transform.localPosition = new Vector3(0f, 1.48f, 0.065f);
         camGo.transform.localRotation = Quaternion.identity;
 
         var cam = camGo.AddComponent<Camera>();
@@ -291,7 +290,7 @@ public static class Paso1JugadorBuilder
         }
 
         // Asegurar que Piso_Loseta_Acabado_6mm y Plafon_PA_Y6.80 en PA_Interior/Llegada_Escalera arranquen exactamente en x = 8.10 m
-        // (sin hueco de 6 cm entre x = 8.10 y 8.16, y sin invadir el vacío de la escalera x = 1.36..8.10):
+        // y mantengan sus UVs en espacio de mundo continuas (sin costuras ni desfase entre losetas):
         foreach (Transform t in llegadaPA.Cast<Transform>().ToArray())
         {
             if (t.name == "Piso_Loseta_Acabado_6mm" || t.name == "Plafon_PA_Y6.80")
@@ -304,6 +303,30 @@ public static class Paso1JugadorBuilder
                 Vector3 sc = t.localScale;
                 sc.z = Mathf.Abs(b.z - a.z);
                 t.localScale = sc;
+
+                var mf = t.GetComponent<MeshFilter>();
+                if (mf != null && mf.sharedMesh != null)
+                {
+                    float fac = t.name == "Piso_Loseta_Acabado_6mm" ? (1f / 0.66f) : (1f / 1.20f);
+                    Mesh m = mf.sharedMesh;
+                    var vv = m.vertices;
+                    var nn = m.normals;
+                    if (vv != null && nn != null && nn.Length == vv.Length)
+                    {
+                        var uvs = new Vector2[vv.Length];
+                        for (int i = 0; i < vv.Length; i++)
+                        {
+                            Vector3 wp = t.TransformPoint(vv[i]);
+                            Vector3 wn = t.TransformDirection(nn[i]).normalized;
+                            uvs[i] = Mathf.Abs(wn.y) > 0.5f
+                                ? new Vector2(wp.x * fac, wp.z * fac)
+                                : new Vector2((Mathf.Abs(wn.z) > 0.5f ? wp.x : wp.z) * fac, wp.y * fac);
+                        }
+                        m.uv = uvs;
+                        m.RecalculateTangents();
+                        EditorUtility.SetDirty(m);
+                    }
+                }
             }
         }
 
@@ -420,31 +443,8 @@ public static class Paso1JugadorBuilder
         vol.sharedProfile = profile;
         volGo.SetActive(false);
 
-        // Lámparas de emergencia ámbar muy tenues (intensidad 0.07, alcance corto 2.6 m) para que solo marquen un punto tenue en el techo sin aclarar el pasillo ni las bancas:
+        // Luces puntuales flotantes de emergencia omitidas para evitar manchas rojizas sin luminaria sobre el plafón:
         var amberLights = new List<Light>();
-        var amberSpecs = new (string name, float x, float y, float z, float range)[]
-        {
-            ("Luz_Emergencia_Ambar_01_VestibuloPB", 22.80f, 3.05f, 19.29f, 2.6f),
-            ("Luz_Emergencia_Ambar_02_EscaleraDescanso", 3.60f, 3.85f, 19.29f, 2.6f),
-            ("Luz_Emergencia_Ambar_03_PlazaSurPA", 14.24f, 6.60f, 41.50f, 2.6f)
-        };
-
-        foreach (var sp in amberSpecs)
-        {
-            var lGo = new GameObject(sp.name);
-            lGo.transform.SetParent(terrorGrp.transform, false);
-            lGo.transform.position = W(sp.x, sp.y, sp.z);
-            var l = lGo.AddComponent<Light>();
-            l.type = LightType.Point;
-            l.color = new Color(1.0f, 0.36f, 0.08f, 1f); // Ámbar rojizo tenue de emergencia
-            l.intensity = 0.07f;
-            l.range = sp.range;
-            l.shadows = LightShadows.None;
-            l.cullingMask = maskInterior;
-            var uld = lGo.AddComponent<UniversalAdditionalLightData>();
-            uld.renderingLayers = uint.MaxValue;
-            amberLights.Add(l);
-        }
 
         // Único fluorescente moribundo que parpadea de forma irregular en el pasillo central norte (PB Sec 06)
         var dyingGo = new GameObject("Luz_Fluorescente_Moribundo_Unico_PasilloNorte");

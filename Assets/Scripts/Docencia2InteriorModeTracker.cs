@@ -15,17 +15,26 @@ namespace Vaelith.Docencia2
 
         private Docencia2VisualMode _lastMode = (Docencia2VisualMode)(-1);
 
+        private void OnEnable()
+        {
+            _lastMode = (Docencia2VisualMode)(-1);
+        }
+
         private void Update()
         {
             if (switcher == null) switcher = Object.FindAnyObjectByType<Docencia2ModeSwitcher>();
             if (switcher == null) return;
 
-            if (switcher.modoActual != _lastMode)
+            bool isTerror = (switcher.modoActual == Docencia2VisualMode.Terror);
+            bool needsSync = (switcher.modoActual != _lastMode)
+                || (nightGroup != null && nightGroup.activeSelf != !isTerror)
+                || (terrorGroup != null && terrorGroup.activeSelf != isTerror);
+
+            if (needsSync)
             {
                 _lastMode = switcher.modoActual;
-                bool isTerror = (_lastMode == Docencia2VisualMode.Terror);
-                if (nightGroup != null) nightGroup.SetActive(!isTerror);
-                if (terrorGroup != null) terrorGroup.SetActive(isTerror);
+                if (nightGroup != null && nightGroup.activeSelf != !isTerror) nightGroup.SetActive(!isTerror);
+                if (terrorGroup != null && terrorGroup.activeSelf != isTerror) terrorGroup.SetActive(isTerror);
             }
         }
     }

@@ -101,9 +101,10 @@ namespace Vaelith.Docencia2
         {
             if (!Application.isPlaying) return;
 
+            bool allowShortcuts = Docencia2FirstPersonPlayer.Instance == null || Docencia2FirstPersonPlayer.Instance.showDebugHudAndShortcuts;
             bool pressed = false;
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
+            if (allowShortcuts && Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
             {
                 pressed = true;
             }
@@ -229,6 +230,13 @@ namespace Vaelith.Docencia2
 
                 if (grupoLucesInteriorNoche != null) grupoLucesInteriorNoche.SetActive(prevNightInt);
                 if (grupoLucesInteriorTerror != null) grupoLucesInteriorTerror.SetActive(prevTerrorInt);
+            }
+
+            if (Application.isPlaying && gameObject.scene.isLoaded &&
+                Docencia2TerrorDarknessController.Instance != null &&
+                Docencia2TerrorDarknessController.Instance.isActiveAndEnabled)
+            {
+                Docencia2TerrorDarknessController.Instance.SyncState();
             }
         }
     }

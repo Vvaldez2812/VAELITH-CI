@@ -20,7 +20,6 @@ namespace Vaelith.Docencia2
         private const string MESH_DIR = "Assets/Models/Docencia2/GeneratedMeshes";
         private const string RENDER_OUT_DIR = "Renders_Verificacion";
 
-        [MenuItem("VAELITH/Alternar Modo NOCHE - TERROR (Exterior_Docencia2)")]
         public static void MenuToggleNightTerror()
         {
             var switcher = UnityEngine.Object.FindAnyObjectByType<Docencia2ModeSwitcher>();
@@ -43,7 +42,6 @@ namespace Vaelith.Docencia2
             }
         }
 
-        [MenuItem("VAELITH/Construir Escena Exterior_Docencia2 (NOCHE + TERROR) y Capturar Vistas")]
         public static void BuildAndRenderAll()
         {
             Debug.Log("[Docencia2] Iniciando construcción dual NOCHE + TERROR (ArchViz & Horror Atmosférico URP Unity 6)...");

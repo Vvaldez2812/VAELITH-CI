@@ -1,9 +1,14 @@
-name: VAELITH QA Windows
+name: VAELITH CI/CD Release & QA Windows
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      verify_rollback_dryrun:
+        description: 'Validar capacidad de rollback atomico en modo DryRun tras despliegue'
+        required: false
+        default: 'true'
 
 permissions:
   contents: read
@@ -14,6 +19,7 @@ concurrency:
 
 jobs:
   release:
+    name: Liberacion Continua y Despliegue QA (Windows x64)
     runs-on: [self-hosted, Windows, X64, unity-6000.6]
     timeout-minutes: 60
     environment: qa
@@ -25,21 +31,36 @@ jobs:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
       BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del repositorio con Git LFS
+        uses: actions/checkout@v4
         with:
           lfs: true
           persist-credentials: false
-      - name: Preparar entorno de liberacion
+
+      - name: Aprovisionar y auditar entorno de liberacion
+        run: ./ci/setup_release_env.ps1
+
+      - name: Preparar manifiesto y espacio limpio de artefactos
         run: ./ci/prepare.ps1
-      - name: Ejecutar pruebas EditMode y PlayMode
+
+      - name: Ejecutar pruebas automatizadas EditMode y PlayMode
         run: ./ci/test.ps1
-      - name: Compilar cliente Windows x64
+
+      - name: Compilar cliente StandaloneWindows64 (Direct3D11)
         run: ./ci/build.ps1
-      - name: Verificar arranque de compilacion
+
+      - name: Ejecutar prueba de humo y telemetria SLA en tiempo real
         run: ./ci/smoke.ps1
-      - name: Desplegar paquete y manifiesto a QA
+
+      - name: Desplegar paquete verificado SHA-256 a entorno QA
         run: ./ci/deploy.ps1
-      - uses: actions/upload-artifact@v4
+
+      - name: Verificar disponibilidad de reversion atomica (DryRun)
+        if: ${{ github.event.inputs.verify_rollback_dryrun != 'false' }}
+        run: ./ci/rollback.ps1 -DryRun
+
+      - name: Publicar artefactos de auditoria, logs y telemetria
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qa-${{ env.BUILD_ID }}

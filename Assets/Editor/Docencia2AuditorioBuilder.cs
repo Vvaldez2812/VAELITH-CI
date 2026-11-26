@@ -8,7 +8,6 @@ using System.Linq;
 using System.Collections.Generic;
 namespace Vaelith.Docencia2 {
  public static partial class Docencia2Phase5Builder {
-  [MenuItem("VAELITH/Interior Docencia 2/Auditorio PB - referencia fotografica")]
   public static void BuildAuditorio(){
    if(EditorApplication.isPlayingOrWillChangePlaymode)throw new System.Exception("Exit Play first");
    var pb=GameObject.Find("PB_Interior").transform;var old=pb.Find("06_Auditorio_PB");if(old)Object.DestroyImmediate(old.gameObject);

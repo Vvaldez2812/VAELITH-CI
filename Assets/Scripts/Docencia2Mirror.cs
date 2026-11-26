@@ -27,7 +27,7 @@ namespace Vaelith.Docencia2
             if(!reflection){var g=new GameObject("__PB_Mirror_RenderCamera"){hideFlags=HideFlags.HideAndDontSave};reflection=g.AddComponent<Camera>();reflection.enabled=false;g.AddComponent<UniversalAdditionalCameraData>();}
             int w=Mathf.Min(1536,Mathf.Max(256,source.pixelWidth*3/4)),h=Mathf.Max(128,Mathf.RoundToInt(w/source.aspect));
             if(!texture||texture.width!=w||texture.height!=h){if(texture){texture.Release();DestroyImmediate(texture);}texture=new RenderTexture(w,h,24,RenderTextureFormat.DefaultHDR){name="PB_Mirror_Temporary",hideFlags=HideFlags.HideAndDontSave,antiAliasing=2,filterMode=FilterMode.Bilinear};texture.Create();}
-            reflection.CopyFrom(source);reflection.allowMSAA=true;reflection.enabled=false;reflection.cameraType=CameraType.Reflection;reflection.targetTexture=texture;reflection.useOcclusionCulling=false;
+            reflection.CopyFrom(source);reflection.cullingMask|=(1<<28);reflection.allowMSAA=true;reflection.enabled=false;reflection.cameraType=CameraType.Reflection;reflection.targetTexture=texture;reflection.useOcclusionCulling=false;
             var data=reflection.GetUniversalAdditionalCameraData();data.renderShadows=false;data.renderPostProcessing=false;data.requiresColorOption=CameraOverrideOption.Off;data.requiresDepthOption=CameraOverrideOption.Off;
             Vector3 n=normal.normalized;float d=-Vector3.Dot(n,point);
             var m=Matrix4x4.identity;

@@ -70,13 +70,11 @@ namespace Vaelith.Docencia2
             }
         }
 
-        [MenuItem("VAELITH/Interior Docencia 2/FASE 1 - Construir Envolvente Planta Baja (PB_Interior)")]
         public static void BuildPhase1PlantaBajaMenu()
         {
             BuildPhase1PlantaBaja(false);
         }
 
-        [MenuItem("VAELITH/Interior Docencia 2/FASE 2 - Construir Escalera en U, Barandal y Columnas PB")]
         public static void BuildPhase2PlantaBajaMenu()
         {
             BuildPhase2PlantaBaja(false);

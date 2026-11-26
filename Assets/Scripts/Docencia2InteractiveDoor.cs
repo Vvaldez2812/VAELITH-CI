@@ -9,6 +9,7 @@ namespace Vaelith.Docencia2
         public float inwardAngle = 90f;
         public bool doubleSwing;
         public bool isOpen;
+        public bool isLocked = false;
 
         [Header("Animación Suave (Paso 1)")]
         public float animationSpeed = 240f; // grados por segundo (~0.375s para 90°)
@@ -44,6 +45,7 @@ namespace Vaelith.Docencia2
 
         public void SetOpen(bool open, bool reverse = false)
         {
+            if (isLocked && open) open = false;
             isOpen = open;
             _animating = false;
             _targetRotation = closedRotation * Quaternion.Euler(0f, open ? inwardAngle * (doubleSwing && reverse ? -1f : 1f) : 0f, 0f);
@@ -53,6 +55,7 @@ namespace Vaelith.Docencia2
 
         public void SetOpenAnimated(bool open, bool reverse = false)
         {
+            if (isLocked && open) return;
             isOpen = open;
             _targetRotation = closedRotation * Quaternion.Euler(0f, open ? inwardAngle * (doubleSwing && reverse ? -1f : 1f) : 0f, 0f);
             if (!Application.isPlaying)
@@ -70,6 +73,7 @@ namespace Vaelith.Docencia2
 
         public void Toggle(Vector3 viewer)
         {
+            if (isLocked) return;
             bool reverse = false;
             if (doubleSwing)
             {

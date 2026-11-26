@@ -59,7 +59,6 @@ namespace Vaelith.Docencia2 {
   static void AddBathFill(Transform zone,bool male){
    var night=zone.Find("Iluminacion_NOCHE_SUPUESTO");if(!night)return;var found=night.Find("Rebote_Cabinas_SUPUESTO");var g=found?found.gameObject:new GameObject("Rebote_Cabinas_SUPUESTO");g.transform.SetParent(night,false);g.transform.position=Docencia2InteriorBuilder.PlanToUnityPos(male?15.2f:13.2f,2.6f,male?1.25f:2.6f);g.layer=8;var l=g.GetComponent<Light>();if(!l)l=g.AddComponent<Light>();l.type=LightType.Point;l.intensity=1.25f;l.range=3.2f;l.shadows=LightShadows.None;l.cullingMask=1<<8;l.color=new Color(.98f,.98f,1f);var data=g.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();if(!data)data=g.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>();data.renderingLayers=male?8u:4u;
   }
-  [MenuItem("VAELITH/Interior Docencia 2/Refinar banos existentes")]
   public static void RefineBathrooms(){
    if(EditorApplication.isPlayingOrWillChangePlaymode){Debug.LogWarning("[Docencia2] Sal de Play Mode primero para ejecutar 'Refinar banos existentes'.");return;}mats=new Dictionary<string,Material>();prototypes=new Dictionary<string,GameObject>();foreach(var path in Directory.GetFiles(MatDir,"*.mat")){var m=AssetDatabase.LoadAssetAtPath<Material>(path);mats[m.name.Substring(3)]=m;}
    MaterialFor("CromoBano",new Color(.72f,.75f,.77f),.75f,.8f);MaterialFor("AguaBano",new Color(.22f,.34f,.34f),.7f,.1f);
